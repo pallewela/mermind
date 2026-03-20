@@ -392,6 +392,27 @@ body.draggingColResize {
   vertical-align: middle;
 }
 
+/* ──── Markmap renderer ──── */
+.markmapRoot {
+  display: flex;
+  flex-direction: column;
+}
+
+.markmapSvg {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border-radius: 16px;
+}
+
+.markmapRoot .markmap-node circle {
+  stroke-width: 1.5px;
+}
+
+.markmapRoot .markmap-link {
+  stroke-width: 2px;
+}
+
 /* Shown when index.html is opened via file:// (ES modules require http/https) */
 .fileProtocolHelp {
   box-sizing: border-box;

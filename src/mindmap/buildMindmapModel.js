@@ -7,6 +7,7 @@ export function buildMindmapModel(source) {
     const data = toMindElixirData(parsed);
     return {
       ok: true,
+      parsed,
       data,
       branchColors: getBranchColors(data),
       error: null,
@@ -14,6 +15,7 @@ export function buildMindmapModel(source) {
   } catch (e) {
     return {
       ok: false,
+      parsed: null,
       data: null,
       branchColors: new Map(),
       error: e instanceof Error ? e : new Error(String(e)),

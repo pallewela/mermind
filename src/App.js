@@ -2,12 +2,15 @@ import React from "https://esm.sh/react@18.3.1";
 import htm from "https://esm.sh/htm@3.1.1";
 import { EditorPane } from "./components/EditorPane.js";
 import { MindmapPane } from "./components/MindmapPane.js";
+import { MarkmapPane } from "./components/MarkmapPane.js";
 import { decodeFromUrlHash, encodeToUrlHash } from "./persistence/urlHash.js";
 import { loadFromLocalStorage, saveToLocalStorage } from "./persistence/localStorage.js";
 import { EXAMPLES } from "./examples.js";
 import { buildMindmapModel } from "./mindmap/buildMindmapModel.js";
 import { useTheme } from "./theme/useTheme.js";
 import { exportPng, exportSvg } from "./mindmap/export.js";
+
+const USE_MARKMAP = import.meta.env.VITE_RENDERER === "markmap";
 
 const html = htm.bind(React.createElement);
 
@@ -163,11 +166,17 @@ export function App() {
           </div>
           <div className="divider dividerDraggable" onMouseDown=${onDividerDown} />
           <div className="pane paneRight" data-export-root="mindmap">
-            <${MindmapPane}
-              model=${model}
-              theme=${theme}
-              themeMode=${themeMode}
-            />
+            ${USE_MARKMAP
+              ? html`<${MarkmapPane}
+                  model=${model}
+                  theme=${theme}
+                  themeMode=${themeMode}
+                />`
+              : html`<${MindmapPane}
+                  model=${model}
+                  theme=${theme}
+                  themeMode=${themeMode}
+                />`}
           </div>
         </div>
       </main>

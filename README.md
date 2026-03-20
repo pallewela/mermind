@@ -2,7 +2,38 @@
 
 Browser-only webapp with **two panes**:
 - **Left**: Mermaid mindmap syntax
-- **Right**: a **prettier mindmap renderer** (does not use Mermaid for rendering)
+- **Right**: a **mindmap diagram** (the app parses Mermaid; rendering uses a separate library, not Mermaid’s own renderer)
+
+## Mindmap renderers (build-time choice)
+
+The same Mermaid text is parsed once (`parseMermaidMindmap`). The resulting tree is then converted for whichever renderer you choose at **build time** via `VITE_RENDERER`:
+
+| Value | Library | Notes |
+|--------|---------|--------|
+| *(unset or anything other than `markmap`)* | **[MindElixir](https://github.com/SSShooter/mind-elixir)** | Default. DOM-based map with custom zoom/pan and toolbar. |
+| `markmap` | **[markmap](https://github.com/markmap/markmap)** ([markmap-view](https://github.com/markmap/markmap)) | SVG + D3; zoom/pan and fold/unfold are built in. Data path: `toMarkmapData.js` → markmap `IPureNode` (`content` + `children`). |
+
+**Local dev**
+
+```bash
+npm run dev              # MindElixir (default)
+npm run dev:markmap      # markmap
+```
+
+**Production build**
+
+```bash
+npm run build            # MindElixir (default)
+npm run build:markmap    # markmap
+```
+
+Set the variable yourself if you prefer:
+
+```bash
+VITE_RENDERER=markmap npm run build
+```
+
+GitHub Actions / CI: pass `VITE_RENDERER=markmap` in the build step environment if you want the markmap build deployed to Pages.
 
 ## Run locally
 
@@ -36,8 +67,10 @@ The repo `index.html` at the root is only the **Vite entry** for `npm run dev` /
 
 ## Features
 - Live render as you type
-- Light/dark themes
+- Light/dark themes (both renderers; markmap text colors follow app theme)
 - Autosave to `localStorage`
 - Share via URL hash (“Copy link”)
 - Export to SVG/PNG
+
+**markmap-specific:** wheel zoom, drag-to-pan, and clicking nodes to fold/unfold come from markmap-view. The right pane also exposes **+ / − / Fit** toolbar buttons.
 
