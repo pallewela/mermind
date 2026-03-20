@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mindmap (Mermaid → Beautiful)</title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+    <link rel="preconnect" href="https://esm.sh" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mind-elixir/dist/style.css" />
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      (function () {
+        if (location.protocol === "file:") {
+          document.getElementById("root").innerHTML =
+            '<div class="fileProtocolHelp">' +
+            "<h1>Cannot open this app from a saved file</h1>" +
+            "<p>Browsers block ES modules on <code>file://</code> URLs. Run a local server from the project folder, then open the URL it prints.</p>" +
+            "<pre><code>npm install\nnpm run dev</code></pre>" +
+            "<p>Or with Python only:</p>" +
+            '<pre><code>python3 -m http.server 5173</code></pre>' +
+            "<p>Then visit <code>http://localhost:5173/</code></p>" +
+            "</div>";
+          return;
+        }
+        var s = document.createElement("script");
+        s.type = "module";
+        s.src = "./src/main.js";
+        document.body.appendChild(s);
+      })();
+    </script>
+  </body>
+</html>
