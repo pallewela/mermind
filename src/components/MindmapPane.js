@@ -5,8 +5,6 @@ import MindElixir from "https://cdn.jsdelivr.net/npm/mind-elixir/dist/MindElixir
 const html = htm.bind(React.createElement);
 
 function safeMarkdown(md) {
-  // We intentionally pass pre-sanitized HTML strings for `topic`.
-  // MindElixir calls this when `markdown` option is enabled.
   return String(md ?? "");
 }
 
@@ -25,41 +23,271 @@ function cubicCurvePath({ pL, pT, pW, pH, cL, cT, cW, cH }) {
   return `M ${x1} ${y1} C ${cx1} ${cy1} ${cx2} ${cy2} ${x2} ${y2}`;
 }
 
+// no-op: actual wheel handling is in attachWheelZoom (capture phase, non-passive)
+function noopWheel() {}
+
+function centerPoint(mind) {
+  const r = mind.container.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+
+function zoomInAtCenter(mind) {
+  const next = Math.min(mind.scaleMax, mind.scaleVal + mind.scaleSensitivity);
+  mind.scale(next, centerPoint(mind));
+}
+
+function zoomOutAtCenter(mind) {
+  const next = Math.max(mind.scaleMin, mind.scaleVal - mind.scaleSensitivity);
+  mind.scale(next, centerPoint(mind));
+}
+
+function resetZoomAndCenter(mind) {
+  mind.scale(1, centerPoint(mind));
+  mind.toCenter();
+}
+
+const PAN_STEP = 48;
+
+function isTypingTarget(el) {
+  if (!el || !el.closest) return false;
+  return Boolean(
+    el.closest(".cm-editor") ||
+      el.closest("textarea") ||
+      el.closest("input") ||
+      el.closest("[contenteditable='true']"),
+  );
+}
+
+/**
+ * Own wheel handler registered with { passive: false } so preventDefault() actually
+ * stops page scroll. MindElixir's internal handler is set to a no-op; all zoom/pan
+ * from the wheel is done here in the capture phase.
+ */
+function attachWheelZoom(rootEl, getMind) {
+  if (!rootEl) return () => {};
+  const handler = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const mind = getMind();
+    if (!mind) return;
+    if (e.shiftKey) {
+      mind.move(-e.deltaY, 0);
+      return;
+    }
+    const step = mind.scaleSensitivity;
+    const next =
+      e.deltaY < 0
+        ? Math.min(mind.scaleMax, mind.scaleVal + step)
+        : Math.max(mind.scaleMin, mind.scaleVal - step);
+    mind.scale(next, { x: e.clientX, y: e.clientY });
+  };
+  rootEl.addEventListener("wheel", handler, { passive: false, capture: true });
+  return () => {
+    rootEl.removeEventListener("wheel", handler, { passive: false, capture: true });
+  };
+}
+
+/**
+ * Middle-button drag + optional left-button drag (when panModeRef is true).
+ * Keyboard shortcuts for zoom / pan / reset.
+ */
+function attachViewportNavigation(mind, getMind, panModeRef) {
+  const container = mind.container;
+  const drag = { mode: null, pid: null, lastX: 0, lastY: 0 };
+
+  const onPointerDown = (e) => {
+    if (e.button === 1) {
+      e.preventDefault();
+      e.stopPropagation();
+      drag.mode = "middle";
+      drag.pid = e.pointerId;
+      drag.lastX = e.clientX;
+      drag.lastY = e.clientY;
+      container.setPointerCapture(e.pointerId);
+      container.style.cursor = "grabbing";
+      return;
+    }
+    if (e.button === 0 && panModeRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      drag.mode = "left";
+      drag.pid = e.pointerId;
+      drag.lastX = e.clientX;
+      drag.lastY = e.clientY;
+      container.setPointerCapture(e.pointerId);
+      container.style.cursor = "grabbing";
+    }
+  };
+
+  const onPointerMove = (e) => {
+    if (!drag.mode || e.pointerId !== drag.pid) return;
+    const m = getMind();
+    if (!m) return;
+    const dx = e.clientX - drag.lastX;
+    const dy = e.clientY - drag.lastY;
+    drag.lastX = e.clientX;
+    drag.lastY = e.clientY;
+    if (dx !== 0 || dy !== 0) m.move(dx, dy);
+  };
+
+  const endPan = (e) => {
+    if (drag.mode && e.pointerId === drag.pid) {
+      drag.mode = null;
+      drag.pid = null;
+      try {
+        container.releasePointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+      container.style.cursor = panModeRef.current ? "grab" : "";
+    }
+  };
+
+  const onKeyDown = (e) => {
+    if (e.defaultPrevented) return;
+    if (isTypingTarget(e.target)) return;
+    const m = getMind();
+    if (!m) return;
+
+    const step = m.scaleSensitivity;
+
+    switch (e.code) {
+      case "Equal":
+      case "NumpadAdd":
+        e.preventDefault();
+        zoomInAtCenter(m);
+        return;
+      case "Minus":
+      case "NumpadSubtract":
+        e.preventDefault();
+        zoomOutAtCenter(m);
+        return;
+      case "Digit0":
+      case "Numpad0":
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          resetZoomAndCenter(m);
+        }
+        return;
+      case "ArrowUp":
+        e.preventDefault();
+        m.move(0, PAN_STEP);
+        return;
+      case "ArrowDown":
+        e.preventDefault();
+        m.move(0, -PAN_STEP);
+        return;
+      case "ArrowLeft":
+        e.preventDefault();
+        m.move(PAN_STEP, 0);
+        return;
+      case "ArrowRight":
+        e.preventDefault();
+        m.move(-PAN_STEP, 0);
+        return;
+      default:
+        break;
+    }
+  };
+
+  container.addEventListener("pointerdown", onPointerDown, true);
+  container.addEventListener("pointermove", onPointerMove, true);
+  container.addEventListener("pointerup", endPan, true);
+  container.addEventListener("pointercancel", endPan, true);
+  window.addEventListener("keydown", onKeyDown, true);
+
+  return () => {
+    container.removeEventListener("pointerdown", onPointerDown, true);
+    container.removeEventListener("pointermove", onPointerMove, true);
+    container.removeEventListener("pointerup", endPan, true);
+    container.removeEventListener("pointercancel", endPan, true);
+    window.removeEventListener("keydown", onKeyDown, true);
+    container.style.cursor = "";
+  };
+}
+
+function combineCleanups(...fns) {
+  return () => {
+    for (const fn of fns) {
+      try {
+        fn?.();
+      } catch {
+        /* ignore */
+      }
+    }
+  };
+}
+
+function createMindOptions(theme, handleWheel) {
+  return {
+    theme,
+    editable: false,
+    draggable: false,
+    contextMenu: false,
+    toolBar: false,
+    keypress: false,
+    overflowHidden: true,
+    markdown: safeMarkdown,
+    alignment: "center",
+    direction: 2,
+    generateMainBranch: cubicCurvePath,
+    generateSubBranch: cubicCurvePath,
+    scaleMin: 0.25,
+    scaleMax: 2.5,
+    scaleSensitivity: 0.12,
+    handleWheel,
+  };
+}
+
 export function MindmapPane({ model, theme, themeMode }) {
+  const mindRootRef = React.useRef(null);
   const containerRef = React.useRef(null);
   const mindRef = React.useRef(null);
+  const navCleanupRef = React.useRef(null);
+  const panModeRef = React.useRef(false);
+  const [leftPanMode, setLeftPanMode] = React.useState(false);
 
   React.useEffect(() => {
-    if (!containerRef.current) return;
-    if (mindRef.current) return;
+    panModeRef.current = leftPanMode;
+    const m = mindRef.current;
+    if (m?.container) {
+      m.container.style.cursor = leftPanMode ? "grab" : "";
+    }
+  }, [leftPanMode]);
 
+  React.useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    navCleanupRef.current?.();
+    navCleanupRef.current = null;
+    el.innerHTML = "";
+
+    const getMind = () => mindRef.current;
     const mind = new MindElixir({
-      el: containerRef.current,
-      theme,
-      editable: false,
-      draggable: false,
-      contextMenu: false,
-      toolBar: false,
-      keypress: false,
-      overflowHidden: true,
-      markdown: safeMarkdown,
-      alignment: "center",
-      direction: 2,
-      generateMainBranch: cubicCurvePath,
-      generateSubBranch: cubicCurvePath,
-      scaleMin: 0.25,
-      scaleMax: 2.5,
-      scaleSensitivity: 0.12,
+      el,
+      ...createMindOptions(theme, noopWheel),
     });
-
     mindRef.current = mind;
+
+    const releaseWheelZoom = attachWheelZoom(mindRootRef.current, getMind);
+    navCleanupRef.current = combineCleanups(releaseWheelZoom, attachViewportNavigation(mind, getMind, panModeRef));
+
+    if (model?.ok) {
+      try {
+        mind.init(model.data);
+      } catch {
+        /* ignore */
+      }
+    }
+
     return () => {
+      navCleanupRef.current?.();
+      navCleanupRef.current = null;
       mindRef.current = null;
-      // MindElixir doesn't expose destroy reliably across versions; remove content.
-      if (containerRef.current) containerRef.current.innerHTML = "";
+      el.innerHTML = "";
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [theme, themeMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
     const mind = mindRef.current;
@@ -68,48 +296,70 @@ export function MindmapPane({ model, theme, themeMode }) {
     try {
       mind.refresh(model.data);
     } catch {
-      mind.init(model.data);
-    }
-  }, [model]);
-
-  React.useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const old = mindRef.current;
-    if (!old) return;
-    // Recreate to ensure theme + cssVars apply consistently.
-    el.innerHTML = "";
-    const mind = new MindElixir({
-      el,
-      theme,
-      editable: false,
-      draggable: false,
-      contextMenu: false,
-      toolBar: false,
-      keypress: false,
-      overflowHidden: true,
-      markdown: safeMarkdown,
-      alignment: "center",
-      direction: 2,
-      generateMainBranch: cubicCurvePath,
-      generateSubBranch: cubicCurvePath,
-      scaleMin: 0.25,
-      scaleMax: 2.5,
-      scaleSensitivity: 0.12,
-    });
-    mindRef.current = mind;
-    if (model?.ok) {
       try {
         mind.init(model.data);
       } catch {
-        // ignore
+        /* ignore */
       }
     }
-    void themeMode;
-  }, [theme, themeMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [model]);
+
+  const onZoomIn = React.useCallback(() => {
+    const m = mindRef.current;
+    if (m) zoomInAtCenter(m);
+  }, []);
+
+  const onZoomOut = React.useCallback(() => {
+    const m = mindRef.current;
+    if (m) zoomOutAtCenter(m);
+  }, []);
+
+  const onZoom100 = React.useCallback(() => {
+    const m = mindRef.current;
+    if (m) resetZoomAndCenter(m);
+  }, []);
+
+  const onToggleLeftPan = React.useCallback(() => {
+    setLeftPanMode((v) => !v);
+  }, []);
 
   return html`
-    <div className="mindRoot">
+    <div className="mindRoot" ref=${mindRootRef}>
+      <div className="mindMapToolbar" aria-label="Map navigation">
+        <button
+          type="button"
+          className="mindMapToolbarBtn"
+          title="Zoom in (scroll up, +, or Ctrl++)"
+          onClick=${onZoomIn}
+        >
+          +
+        </button>
+        <button
+          type="button"
+          className="mindMapToolbarBtn"
+          title="Zoom out (scroll down, −, or Ctrl+−)"
+          onClick=${onZoomOut}
+        >
+          −
+        </button>
+        <button
+          type="button"
+          className="mindMapToolbarBtn mindMapToolbarBtnWide"
+          title="100% zoom and re-center (Ctrl+0 or Cmd+0)"
+          onClick=${onZoom100}
+        >
+          100%
+        </button>
+        <button
+          type="button"
+          className=${`mindMapToolbarBtn mindMapToolbarBtnWide ${leftPanMode ? "active" : ""}`}
+          title="Drag with left button to pan (also: middle button drag, arrow keys)"
+          onClick=${onToggleLeftPan}
+          aria-pressed=${leftPanMode}
+        >
+          Pan
+        </button>
+      </div>
       <div className="mindElixirContainer mind-elixir" ref=${containerRef}></div>
       ${model?.ok
         ? null
@@ -121,4 +371,3 @@ export function MindmapPane({ model, theme, themeMode }) {
     </div>
   `;
 }
-

@@ -121,6 +121,7 @@ export function App() {
           >
             <option value="mindMapping">What is mind mapping?</option>
             <option value="cafe">Cafe</option>
+            <option value="complex">Complex</option>
           </select>
           <button className="btn" onClick=${onResetExample} title="Reset">
             Reset
