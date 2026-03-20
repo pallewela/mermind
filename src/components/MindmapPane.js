@@ -206,6 +206,58 @@ function attachViewportNavigation(mind, getMind, panModeRef) {
   };
 }
 
+/**
+ * Click a node topic (ME-TPC) to collapse/expand its children.
+ * Skips root (no parent) and leaf nodes (no children).
+ * Tracks pointer movement to avoid toggling after a pan drag.
+ */
+function attachClickToToggle(rootEl, getMind) {
+  let startX = 0, startY = 0, moved = false;
+
+  const onPointerDown = (e) => {
+    startX = e.clientX;
+    startY = e.clientY;
+    moved = false;
+  };
+
+  const onPointerMove = (e) => {
+    if (!moved) {
+      const dx = Math.abs(e.clientX - startX);
+      const dy = Math.abs(e.clientY - startY);
+      if (dx > 4 || dy > 4) moved = true;
+    }
+  };
+
+  const onClick = (e) => {
+    if (moved) return;
+    const mind = getMind();
+    if (!mind) return;
+
+    let tpc = e.target;
+    while (tpc && tpc.tagName !== "ME-TPC" && tpc !== rootEl) {
+      tpc = tpc.parentElement;
+    }
+    if (!tpc || tpc.tagName !== "ME-TPC") return;
+
+    const nodeObj = tpc.nodeObj;
+    if (!nodeObj) return;
+    if (!nodeObj.parent) return;
+    if (!nodeObj.children?.length) return;
+
+    mind.expandNode(tpc);
+  };
+
+  rootEl.addEventListener("pointerdown", onPointerDown);
+  rootEl.addEventListener("pointermove", onPointerMove);
+  rootEl.addEventListener("click", onClick);
+
+  return () => {
+    rootEl.removeEventListener("pointerdown", onPointerDown);
+    rootEl.removeEventListener("pointermove", onPointerMove);
+    rootEl.removeEventListener("click", onClick);
+  };
+}
+
 function combineCleanups(...fns) {
   return () => {
     for (const fn of fns) {
@@ -271,7 +323,12 @@ export function MindmapPane({ model, theme, themeMode }) {
     mindRef.current = mind;
 
     const releaseWheelZoom = attachWheelZoom(mindRootRef.current, getMind);
-    navCleanupRef.current = combineCleanups(releaseWheelZoom, attachViewportNavigation(mind, getMind, panModeRef));
+    const releaseClickToggle = attachClickToToggle(mindRootRef.current, getMind);
+    navCleanupRef.current = combineCleanups(
+      releaseWheelZoom,
+      releaseClickToggle,
+      attachViewportNavigation(mind, getMind, panModeRef),
+    );
 
     if (model?.ok) {
       try {

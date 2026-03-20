@@ -344,6 +344,26 @@ body.draggingColResize {
   font-weight: 700 !important;
 }
 
+/* Nodes with children: pointer cursor hint */
+.mind-elixir me-parent:has(> me-epd) > me-tpc {
+  cursor: pointer !important;
+}
+
+/* Collapsed indicator (me-epd without .minus class = collapsed).
+   MindElixir hides the "−" at opacity:0 when expanded; we keep that.
+   For collapsed nodes, make the "+" circle always visible and larger. */
+.mind-elixir me-epd:not(.minus) {
+  opacity: 1 !important;
+  width: 22px !important;
+  height: 22px !important;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.15));
+  transition: transform 0.15s ease;
+}
+
+.mind-elixir me-epd:not(.minus):hover {
+  transform: translateY(-50%) scale(1.2);
+}
+
 /* Curvy, thick connectors */
 .mind-elixir svg path {
   stroke-linecap: round !important;
