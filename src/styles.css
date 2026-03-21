@@ -282,6 +282,12 @@ body.draggingColResize {
   color: var(--text);
 }
 
+.mindMapToolbarBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .mindMapToolbarBtnWide {
   min-width: auto;
   font-size: 12px;

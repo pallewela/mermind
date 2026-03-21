@@ -72,5 +72,5 @@ The repo `index.html` at the root is only the **Vite entry** for `npm run dev` /
 - Share via URL hash (“Copy link”)
 - Export to SVG/PNG
 
-**markmap-specific:** wheel zoom, drag-to-pan, and clicking nodes to fold/unfold come from markmap-view. The right pane also exposes **+ / − / Fit** toolbar buttons.
+**markmap-specific:** wheel zoom, drag-to-pan, and clicking nodes to fold/unfold come from markmap-view. The toolbar adds **+ / − / Fit** plus **Tier−** / **Tier+** to collapse or reveal one depth level at a time (using markmap’s `initialExpandLevel`). Editing the Mermaid text resets tier expansion to fully open.
 
