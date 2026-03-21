@@ -150,18 +150,17 @@ export function MarkmapPane({ model, theme, themeMode }) {
     if (mm) mm.fit();
   }, []);
 
-  const fullLevel = maxD + 1;
+  const fullLevel = maxD;
   const effectiveLevel = expandLevel === -1 ? fullLevel : expandLevel;
-  const canFoldTier = model?.ok && maxD >= 2 && effectiveLevel > 2;
+  const canFoldTier = model?.ok && maxD >= 2 && effectiveLevel > 1;
   const canExpandTier =
     model?.ok && maxD >= 2 && effectiveLevel < fullLevel;
 
   const onFoldOneDepth = React.useCallback(() => {
     setExpandLevel((prev) => {
       if (maxD < 2) return prev;
-      const full = maxD + 1;
-      const cur = prev === -1 ? full : prev;
-      if (cur <= 2) return prev;
+      const cur = prev === -1 ? maxD : prev;
+      if (cur <= 1) return prev;
       return cur - 1;
     });
   }, [maxD]);
@@ -169,11 +168,10 @@ export function MarkmapPane({ model, theme, themeMode }) {
   const onExpandOneDepth = React.useCallback(() => {
     setExpandLevel((prev) => {
       if (maxD < 2) return prev;
-      const full = maxD + 1;
-      const cur = prev === -1 ? full : prev;
-      if (cur >= full) return prev;
+      const cur = prev === -1 ? maxD : prev;
+      if (cur >= maxD) return prev;
       const next = cur + 1;
-      return next >= full ? -1 : next;
+      return next >= maxD ? -1 : next;
     });
   }, [maxD]);
 
