@@ -17,12 +17,22 @@ function timestamp() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
 
+/** Exclude toolbar buttons and overlays from the export capture. */
+function exportFilter(node) {
+  if (!(node instanceof Element)) return true;
+  return (
+    !node.classList.contains("mindMapToolbar") &&
+    !node.classList.contains("mindOverlay")
+  );
+}
+
 export async function exportPng(el) {
   if (!el) throw new Error("Export target not found.");
   const dataUrl = await htmlToImage.toPng(el, {
     cacheBust: true,
     pixelRatio: Math.min(3, window.devicePixelRatio || 2),
     backgroundColor: getComputedStyle(document.documentElement).getPropertyValue("--mind-bg") || undefined,
+    filter: exportFilter,
   });
   const res = await fetch(dataUrl);
   const blob = await res.blob();
@@ -34,6 +44,7 @@ export async function exportSvg(el) {
   const dataUrl = await htmlToImage.toSvg(el, {
     cacheBust: true,
     backgroundColor: getComputedStyle(document.documentElement).getPropertyValue("--mind-bg") || undefined,
+    filter: exportFilter,
   });
   const res = await fetch(dataUrl);
   const blob = await res.blob();
