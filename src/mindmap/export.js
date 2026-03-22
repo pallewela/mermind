@@ -17,7 +17,94 @@ function timestamp() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
 
-/** Exclude toolbar buttons and overlays from the export capture. */
+function getBgColor() {
+  return (
+    getComputedStyle(document.documentElement).getPropertyValue("--mind-bg") ||
+    "#ffffff"
+  );
+}
+
+// ── Renderer detection ──────────────────────────────────────────────
+
+function findMarkmap(exportRoot) {
+  const svg = exportRoot.querySelector("svg.__markmap, svg.markmapSvg");
+  return svg?.__markmap ?? null;
+}
+
+function findMindElixir(exportRoot) {
+  const container = exportRoot.querySelector(".mind-elixir");
+  return container?.__mindElixir ?? null;
+}
+
+// ── Markmap (SVG-native) export ─────────────────────────────────────
+
+const EXPORT_PADDING = 30;
+
+function buildMarkmapSvgString(mm) {
+  const svgEl = mm.svg.node();
+  const { x1, y1, x2, y2 } = mm.state.rect;
+  const w = x2 - x1 + EXPORT_PADDING * 2;
+  const h = y2 - y1 + EXPORT_PADDING * 2;
+
+  const clone = svgEl.cloneNode(true);
+  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  clone.setAttribute("width", w);
+  clone.setAttribute("height", h);
+  clone.setAttribute(
+    "viewBox",
+    `${x1 - EXPORT_PADDING} ${y1 - EXPORT_PADDING} ${w} ${h}`,
+  );
+
+  const g = clone.querySelector("g");
+  if (g) g.removeAttribute("transform");
+
+  return { svgString: new XMLSerializer().serializeToString(clone), w, h };
+}
+
+async function exportMarkmapAsPng(mm) {
+  const { svgString, w, h } = buildMarkmapSvgString(mm);
+  const ratio = Math.min(3, window.devicePixelRatio || 2);
+  const canvas = document.createElement("canvas");
+  canvas.width = w * ratio;
+  canvas.height = h * ratio;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(ratio, ratio);
+
+  const bg = getBgColor();
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+
+  const img = new Image();
+  const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = reject;
+    img.src = url;
+  });
+
+  ctx.drawImage(img, 0, 0, w, h);
+  URL.revokeObjectURL(url);
+
+  const pngBlob = await new Promise((r) => canvas.toBlob(r, "image/png"));
+  downloadBlob(pngBlob, `mindmap_${timestamp()}.png`);
+}
+
+function exportMarkmapAsSvg(mm) {
+  const { svgString } = buildMarkmapSvgString(mm);
+  const bg = getBgColor();
+  const withBg = svgString.replace(
+    /(<svg[^>]*>)/,
+    `$1<rect width="100%" height="100%" fill="${bg}" />`,
+  );
+  const blob = new Blob([withBg], { type: "image/svg+xml;charset=utf-8" });
+  downloadBlob(blob, `mindmap_${timestamp()}.svg`);
+}
+
+// ── MindElixir (DOM-based) export ───────────────────────────────────
+
+/** Exclude toolbar buttons and overlays from the html-to-image capture. */
 function exportFilter(node) {
   if (!(node instanceof Element)) return true;
   return (
@@ -26,28 +113,72 @@ function exportFilter(node) {
   );
 }
 
+function centerPoint(mind) {
+  const r = mind.container.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+
+async function withMindElixirReset(mind, exportRoot, captureFn) {
+  const savedScale = mind.scaleVal;
+  const savedScrollLeft = mind.container.scrollLeft;
+  const savedScrollTop = mind.container.scrollTop;
+
+  mind.scale(1, centerPoint(mind));
+  mind.toCenter();
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  try {
+    return await captureFn(exportRoot);
+  } finally {
+    mind.scale(savedScale, centerPoint(mind));
+    mind.container.scrollLeft = savedScrollLeft;
+    mind.container.scrollTop = savedScrollTop;
+  }
+}
+
+async function exportMindElixirAsPng(mind, exportRoot) {
+  await withMindElixirReset(mind, exportRoot, async (el) => {
+    const dataUrl = await htmlToImage.toPng(el, {
+      cacheBust: true,
+      pixelRatio: Math.min(3, window.devicePixelRatio || 2),
+      backgroundColor: getBgColor(),
+      filter: exportFilter,
+    });
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    downloadBlob(blob, `mindmap_${timestamp()}.png`);
+  });
+}
+
+async function exportMindElixirAsSvg(mind, exportRoot) {
+  await withMindElixirReset(mind, exportRoot, async (el) => {
+    const dataUrl = await htmlToImage.toSvg(el, {
+      cacheBust: true,
+      backgroundColor: getBgColor(),
+      filter: exportFilter,
+    });
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    downloadBlob(blob, `mindmap_${timestamp()}.svg`);
+  });
+}
+
+// ── Public API ──────────────────────────────────────────────────────
+
 export async function exportPng(el) {
   if (!el) throw new Error("Export target not found.");
-  const dataUrl = await htmlToImage.toPng(el, {
-    cacheBust: true,
-    pixelRatio: Math.min(3, window.devicePixelRatio || 2),
-    backgroundColor: getComputedStyle(document.documentElement).getPropertyValue("--mind-bg") || undefined,
-    filter: exportFilter,
-  });
-  const res = await fetch(dataUrl);
-  const blob = await res.blob();
-  downloadBlob(blob, `mindmap_${timestamp()}.png`);
+  const mm = findMarkmap(el);
+  if (mm) return exportMarkmapAsPng(mm);
+  const mind = findMindElixir(el);
+  if (mind) return exportMindElixirAsPng(mind, el);
+  throw new Error("No renderer found for export.");
 }
 
 export async function exportSvg(el) {
   if (!el) throw new Error("Export target not found.");
-  const dataUrl = await htmlToImage.toSvg(el, {
-    cacheBust: true,
-    backgroundColor: getComputedStyle(document.documentElement).getPropertyValue("--mind-bg") || undefined,
-    filter: exportFilter,
-  });
-  const res = await fetch(dataUrl);
-  const blob = await res.blob();
-  downloadBlob(blob, `mindmap_${timestamp()}.svg`);
+  const mm = findMarkmap(el);
+  if (mm) return exportMarkmapAsSvg(mm);
+  const mind = findMindElixir(el);
+  if (mind) return exportMindElixirAsSvg(mind, el);
+  throw new Error("No renderer found for export.");
 }
-

@@ -321,6 +321,7 @@ export function MindmapPane({ model, theme, themeMode }) {
       ...createMindOptions(theme, noopWheel),
     });
     mindRef.current = mind;
+    el.__mindElixir = mind;
 
     const releaseWheelZoom = attachWheelZoom(mindRootRef.current, getMind);
     const releaseClickToggle = attachClickToToggle(mindRootRef.current, getMind);
@@ -342,6 +343,7 @@ export function MindmapPane({ model, theme, themeMode }) {
       navCleanupRef.current?.();
       navCleanupRef.current = null;
       mindRef.current = null;
+      el.__mindElixir = null;
       el.innerHTML = "";
     };
   }, [theme, themeMode]); // eslint-disable-line react-hooks/exhaustive-deps

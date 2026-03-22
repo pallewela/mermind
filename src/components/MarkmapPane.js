@@ -94,10 +94,12 @@ export function MarkmapPane({ model, theme, themeMode }) {
       style: themeMode === "dark" ? makeDarkStyle : makeLightStyle,
     });
     mmRef.current = mm;
+    svg.__markmap = mm;
 
     return () => {
       mm.destroy();
       mmRef.current = null;
+      svg.__markmap = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
