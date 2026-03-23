@@ -100,7 +100,9 @@ npm run test:markmap
 **Debug interactively** (Playwright UI mode with time-travel, test picker):
 
 ```bash
-npm run test:ui
+npm run test:ui                 # all projects (both renderers)
+npm run test:ui:mindelixir      # MindElixir only (port 5173)
+npm run test:ui:markmap         # markmap only (port 5174)
 ```
 
 Other useful flags: `npx playwright test --headed` (visible browser), `npx playwright test --debug` (step-by-step).

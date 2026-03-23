@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
+    "test:ui:mindelixir": "playwright test --ui --project=mindelixir",
+    "test:ui:markmap": "playwright test --ui --project=markmap",
     "test:mindelixir": "playwright test --project=mindelixir",
     "test:markmap": "playwright test --project=markmap"
   },
