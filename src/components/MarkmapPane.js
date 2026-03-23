@@ -135,16 +135,12 @@ export function MarkmapPane({ model, theme, themeMode }) {
 
   const onZoomIn = React.useCallback(() => {
     const mm = mmRef.current;
-    if (!mm) return;
-    const cur = mm.svg.node().__zoom?.k ?? 1;
-    mm.rescale(Math.min(4, cur * 1.25));
+    if (mm) mm.rescale(1.25);
   }, []);
 
   const onZoomOut = React.useCallback(() => {
     const mm = mmRef.current;
-    if (!mm) return;
-    const cur = mm.svg.node().__zoom?.k ?? 1;
-    mm.rescale(Math.max(0.1, cur / 1.25));
+    if (mm) mm.rescale(1 / 1.25);
   }, []);
 
   const onFit = React.useCallback(() => {

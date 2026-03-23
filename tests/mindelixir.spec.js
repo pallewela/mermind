@@ -29,6 +29,73 @@ test.describe("MindElixir renderer", () => {
     await expect(panBtn).toHaveAttribute("aria-pressed", "false");
   });
 
+  test("zoom in button increases zoom level", async ({ page }) => {
+    const getZoom = () =>
+      page.evaluate(() => {
+        const el = document.querySelector(".mind-elixir");
+        return el?.__mindElixir?.scaleVal ?? 1;
+      });
+    const before = await getZoom();
+    await page.click('button[title*="Zoom in"]');
+    await page.waitForTimeout(300);
+    const after = await getZoom();
+    expect(after).toBeGreaterThan(before);
+  });
+
+  test("zoom out button decreases zoom level", async ({ page }) => {
+    const getZoom = () =>
+      page.evaluate(() => {
+        const el = document.querySelector(".mind-elixir");
+        return el?.__mindElixir?.scaleVal ?? 1;
+      });
+    const before = await getZoom();
+    await page.click('button[title*="Zoom out"]');
+    await page.waitForTimeout(300);
+    const after = await getZoom();
+    expect(after).toBeLessThan(before);
+  });
+
+  test("zoom in then zoom out returns to original scale", async ({
+    page,
+  }) => {
+    const getZoom = () =>
+      page.evaluate(() => {
+        const el = document.querySelector(".mind-elixir");
+        return el?.__mindElixir?.scaleVal ?? 1;
+      });
+    const original = await getZoom();
+
+    await page.click('button[title*="Zoom in"]');
+    await page.waitForTimeout(200);
+    await page.click('button[title*="Zoom in"]');
+    await page.waitForTimeout(200);
+    const zoomedIn = await getZoom();
+    expect(zoomedIn).toBeGreaterThan(original);
+
+    await page.click('button[title*="Zoom out"]');
+    await page.waitForTimeout(200);
+    await page.click('button[title*="Zoom out"]');
+    await page.waitForTimeout(200);
+    const restored = await getZoom();
+    expect(restored).toBeCloseTo(original, 4);
+  });
+
+  test("100% button resets zoom to 1", async ({ page }) => {
+    await page.click('button[title*="Zoom in"]');
+    await page.click('button[title*="Zoom in"]');
+    await page.click('button[title*="Zoom in"]');
+    await page.waitForTimeout(300);
+
+    await page.click('button[title*="100% zoom"]');
+    await page.waitForTimeout(300);
+
+    const zoom = await page.evaluate(() => {
+      const el = document.querySelector(".mind-elixir");
+      return el?.__mindElixir?.scaleVal ?? 1;
+    });
+    expect(zoom).toBeCloseTo(1, 4);
+  });
+
   test("error overlay appears when editor is cleared", async ({ page }) => {
     const editor = page.locator(".cm-content");
     await editor.click();

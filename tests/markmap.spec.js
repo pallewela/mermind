@@ -1,5 +1,24 @@
 import { test, expect } from "./shared/fixtures.js";
 
+/**
+ * Poll until the markmap d3 zoom transform stabilises (transition done).
+ * Returns the final scale value.
+ */
+async function stableZoom(page) {
+  return page.evaluate(async () => {
+    const svg = document.querySelector(".markmapSvg");
+    const read = () => svg?.__zoom?.k ?? 1;
+    let prev = read();
+    for (let i = 0; i < 30; i++) {
+      await new Promise((r) => setTimeout(r, 60));
+      const cur = read();
+      if (cur === prev) return cur;
+      prev = cur;
+    }
+    return prev;
+  });
+}
+
 test.describe("Markmap renderer", () => {
   test.beforeEach(async ({ page, renderer }) => {
     test.skip(renderer !== "markmap", "Markmap tests only");
@@ -62,6 +81,53 @@ test.describe("Markmap renderer", () => {
       await page.waitForTimeout(200);
     }
     await expect(tierMinus).toBeDisabled();
+  });
+
+  test("zoom in button increases zoom level", async ({ page }) => {
+    const before = await stableZoom(page);
+    await page.click('button[title*="Zoom in"]');
+    const after = await stableZoom(page);
+    expect(after).toBeGreaterThan(before);
+  });
+
+  test("zoom out button decreases zoom level", async ({ page }) => {
+    const before = await stableZoom(page);
+    await page.click('button[title*="Zoom out"]');
+    const after = await stableZoom(page);
+    expect(after).toBeLessThan(before);
+  });
+
+  test("zoom in ×2 then zoom out ×2 returns to original scale", async ({
+    page,
+  }) => {
+    const original = await stableZoom(page);
+
+    await page.click('button[title*="Zoom in"]');
+    await stableZoom(page);
+    await page.click('button[title*="Zoom in"]');
+    const zoomedIn = await stableZoom(page);
+    expect(zoomedIn).toBeGreaterThan(original);
+
+    await page.click('button[title*="Zoom out"]');
+    await stableZoom(page);
+    await page.click('button[title*="Zoom out"]');
+    const restored = await stableZoom(page);
+    expect(restored).toBeCloseTo(original, 2);
+  });
+
+  test("Fit button resets zoom after zooming in", async ({ page }) => {
+    const initial = await stableZoom(page);
+
+    for (let i = 0; i < 5; i++) {
+      await page.click('button[title*="Zoom in"]');
+      await stableZoom(page);
+    }
+    const zoomedIn = await stableZoom(page);
+    expect(zoomedIn).toBeGreaterThan(initial * 1.5);
+
+    await page.click('button[title*="Fit"]');
+    const afterFit = await stableZoom(page);
+    expect(afterFit).toBeLessThan(zoomedIn);
   });
 
   test("error overlay appears when editor is cleared", async ({ page }) => {
