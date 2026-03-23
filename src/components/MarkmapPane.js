@@ -23,8 +23,8 @@ function makeDarkStyle(id) {
     .markmap {
       background: transparent;
     }
-    .markmap-node text {
-      fill: #e5e7eb;
+    .markmap-node foreignObject div {
+      color: #e5e7eb;
     }
     .markmap-link {
       stroke-opacity: 0.85;
@@ -37,8 +37,8 @@ function makeLightStyle(id) {
     .markmap {
       background: transparent;
     }
-    .markmap-node text {
-      fill: #1e293b;
+    .markmap-node foreignObject div {
+      color: #1e293b;
     }
     .markmap-link {
       stroke-opacity: 0.85;

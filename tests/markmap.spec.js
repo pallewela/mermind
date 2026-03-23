@@ -1,6 +1,36 @@
 import { test, expect } from "./shared/fixtures.js";
 
 /**
+ * Compute the WCAG contrast ratio between markmap node text and the
+ * pane background. Returns the ratio (e.g. 7.0 means 7:1).
+ */
+async function getNodeTextContrast(page) {
+  return page.evaluate(() => {
+    function parseRgb(str) {
+      const m = str.match(/(\d+)/g);
+      return m ? m.slice(0, 3).map(Number) : [0, 0, 0];
+    }
+    function luminance([r, g, b]) {
+      const [rs, gs, bs] = [r, g, b].map((c) => {
+        c /= 255;
+        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+      });
+      return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+    }
+    const node = document.querySelector(
+      ".markmapSvg .markmap-node foreignObject div",
+    );
+    const bg = document.querySelector(".paneRight");
+    if (!node || !bg) return 0;
+    const textRgb = parseRgb(getComputedStyle(node).color);
+    const bgRgb = parseRgb(getComputedStyle(bg).backgroundColor);
+    const l1 = luminance(textRgb);
+    const l2 = luminance(bgRgb);
+    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+  });
+}
+
+/**
  * Poll until the markmap d3 zoom transform stabilises (transition done).
  * Returns the final scale value.
  */
@@ -146,5 +176,19 @@ test.describe("Markmap renderer", () => {
     await expect(svg).toBeVisible();
     await expect(svg).toContainText("Mind Mapping");
     await expect(svg).toContainText("Planning");
+  });
+
+  test("node text is readable in light mode", async ({ page }) => {
+    await page.click("text=Light");
+    await page.waitForTimeout(300);
+    const contrast = await getNodeTextContrast(page);
+    expect(contrast).toBeGreaterThan(4.5);
+  });
+
+  test("node text is readable in dark mode", async ({ page }) => {
+    await page.click("text=Dark");
+    await page.waitForTimeout(300);
+    const contrast = await getNodeTextContrast(page);
+    expect(contrast).toBeGreaterThan(4.5);
   });
 });
