@@ -1,4 +1,4 @@
-import { test, expect } from "./shared/fixtures.js";
+import { test, expect, selectAllInFocusedEditor } from "./shared/fixtures.js";
 
 test.describe("Editor", () => {
   test.beforeEach(async ({ page }) => {
@@ -18,7 +18,7 @@ test.describe("Editor", () => {
   test("syntax error shows parse error bar", async ({ page }) => {
     const editor = page.locator(".cm-content");
     await editor.click();
-    await page.keyboard.press("Meta+a");
+    await selectAllInFocusedEditor(page);
     await page.keyboard.type("this is not valid mermaid");
     await page.waitForTimeout(500);
     await expect(page.locator(".errorBar")).toBeVisible();
@@ -28,13 +28,13 @@ test.describe("Editor", () => {
   test("fixing syntax error hides error bar", async ({ page }) => {
     const editor = page.locator(".cm-content");
     await editor.click();
-    await page.keyboard.press("Meta+a");
+    await selectAllInFocusedEditor(page);
     await page.keyboard.type("this is not valid mermaid");
     await page.waitForTimeout(500);
     await expect(page.locator(".errorBar")).toBeVisible();
 
     await editor.click();
-    await page.keyboard.press("Meta+a");
+    await selectAllInFocusedEditor(page);
     await page.keyboard.type("mindmap\n  root(Fixed)");
     await page.waitForTimeout(500);
     await expect(page.locator(".errorBar")).not.toBeVisible();

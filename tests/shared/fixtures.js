@@ -13,4 +13,9 @@ export const test = base.extend({
   ],
 });
 
+/** Cmd+A on macOS, Ctrl+A on Linux/Windows — use instead of Meta+a in CI. */
+export async function selectAllInFocusedEditor(page) {
+  await page.keyboard.press("ControlOrMeta+a");
+}
+
 export { expect } from "@playwright/test";

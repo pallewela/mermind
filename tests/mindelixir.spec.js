@@ -1,4 +1,4 @@
-import { test, expect } from "./shared/fixtures.js";
+import { test, expect, selectAllInFocusedEditor } from "./shared/fixtures.js";
 
 /**
  * Compute the WCAG contrast ratio between MindElixir topic text and its
@@ -138,7 +138,7 @@ test.describe("MindElixir renderer", () => {
   test("error overlay appears when editor is cleared", async ({ page }) => {
     const editor = page.locator(".cm-content");
     await editor.click();
-    await page.keyboard.press("Meta+a");
+    await selectAllInFocusedEditor(page);
     await page.keyboard.type("broken text no mindmap header");
     await page.waitForTimeout(500);
 

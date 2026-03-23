@@ -1,4 +1,4 @@
-import { test, expect } from "./shared/fixtures.js";
+import { test, expect, selectAllInFocusedEditor } from "./shared/fixtures.js";
 
 test.describe("Persistence", () => {
   test("editor text persists in localStorage across reload", async ({
@@ -9,7 +9,7 @@ test.describe("Persistence", () => {
 
     const editor = page.locator(".cm-content");
     await editor.click();
-    await page.keyboard.press("Meta+a");
+    await selectAllInFocusedEditor(page);
     await page.keyboard.type("mindmap\n  root(Persisted)");
     await page.waitForTimeout(500);
 
