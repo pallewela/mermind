@@ -74,3 +74,36 @@ The repo `index.html` at the root is only the **Vite entry** for `npm run dev` /
 
 **markmap-specific:** wheel zoom, drag-to-pan, and clicking nodes to fold/unfold come from markmap-view. The toolbar adds **+ / − / Fit** plus **Tier−** / **Tier+** to collapse or reveal one depth level at a time (using markmap’s `initialExpandLevel`). Editing the Mermaid text resets tier expansion to fully open.
 
+## UI tests (Playwright)
+
+End-to-end tests cover both renderers (MindElixir and markmap) using Playwright with Chromium.
+
+**First-time setup** (after `npm install`):
+
+```bash
+npx playwright install chromium
+```
+
+**Run all tests** (both renderers; Vite dev servers start automatically):
+
+```bash
+npm test
+```
+
+**Run one renderer only:**
+
+```bash
+npm run test:mindelixir
+npm run test:markmap
+```
+
+**Debug interactively** (Playwright UI mode with time-travel, test picker):
+
+```bash
+npm run test:ui
+```
+
+Other useful flags: `npx playwright test --headed` (visible browser), `npx playwright test --debug` (step-by-step).
+
+**CI:** GitHub Actions runs `npm test` before deploying to Pages. The Playwright HTML report is uploaded as an artifact on every run. Local green = CI expectation.
+
