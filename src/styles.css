@@ -339,6 +339,10 @@ body.draggingColResize {
   box-shadow: 0 12px 26px rgba(0, 0, 0, 0.35) !important;
 }
 
+[data-theme="dark"] .mind-elixir me-tpc {
+  background: rgba(15, 23, 42, 0.80) !important;
+}
+
 .mind-elixir .root {
   border-radius: 18px !important;
   padding: 14px 16px !important;
