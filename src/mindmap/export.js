@@ -40,59 +40,81 @@ function findMindElixir(exportRoot) {
 
 const EXPORT_PADDING = 30;
 
-function buildMarkmapSvgString(mm) {
-  const svgEl = mm.svg.node();
+function markmapContentRect(mm) {
   const { x1, y1, x2, y2 } = mm.state.rect;
   const w = x2 - x1 + EXPORT_PADDING * 2;
   const h = y2 - y1 + EXPORT_PADDING * 2;
+  const vb = `${x1 - EXPORT_PADDING} ${y1 - EXPORT_PADDING} ${w} ${h}`;
+  return { w, h, vb };
+}
+
+/**
+ * Temporarily set the live SVG to show the full content (reset viewBox
+ * and g transform), run `captureFn`, then restore everything.
+ */
+async function withMarkmapFullView(mm, captureFn) {
+  const svgEl = mm.svg.node();
+  const gEl = mm.g.node();
+  const { w, h, vb } = markmapContentRect(mm);
+
+  const saved = {
+    viewBox: svgEl.getAttribute("viewBox"),
+    width: svgEl.getAttribute("width"),
+    height: svgEl.getAttribute("height"),
+    style: svgEl.style.cssText,
+    gTransform: gEl.getAttribute("transform"),
+  };
+
+  svgEl.setAttribute("viewBox", vb);
+  svgEl.setAttribute("width", w);
+  svgEl.setAttribute("height", h);
+  svgEl.style.cssText = `position:fixed;left:0;top:0;width:${w}px;height:${h}px;z-index:-1;pointer-events:none;`;
+  if (gEl) gEl.removeAttribute("transform");
+
+  try {
+    return await captureFn(svgEl, w, h);
+  } finally {
+    const restore = (attr, val) =>
+      val != null
+        ? svgEl.setAttribute(attr, val)
+        : svgEl.removeAttribute(attr);
+    restore("viewBox", saved.viewBox);
+    restore("width", saved.width);
+    restore("height", saved.height);
+    svgEl.style.cssText = saved.style;
+    if (saved.gTransform) gEl.setAttribute("transform", saved.gTransform);
+  }
+}
+
+async function exportMarkmapAsPng(mm) {
+  await withMarkmapFullView(mm, async (svgEl, w, h) => {
+    const dataUrl = await htmlToImage.toPng(svgEl, {
+      cacheBust: true,
+      width: w,
+      height: h,
+      pixelRatio: Math.min(3, window.devicePixelRatio || 2),
+      backgroundColor: getBgColor(),
+    });
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    downloadBlob(blob, `mindmap_${timestamp()}.png`);
+  });
+}
+
+function exportMarkmapAsSvg(mm) {
+  const svgEl = mm.svg.node();
+  const gEl = mm.g.node();
+  const { w, h, vb } = markmapContentRect(mm);
 
   const clone = svgEl.cloneNode(true);
   clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
   clone.setAttribute("width", w);
   clone.setAttribute("height", h);
-  clone.setAttribute(
-    "viewBox",
-    `${x1 - EXPORT_PADDING} ${y1 - EXPORT_PADDING} ${w} ${h}`,
-  );
-
+  clone.setAttribute("viewBox", vb);
   const g = clone.querySelector("g");
   if (g) g.removeAttribute("transform");
 
-  return { svgString: new XMLSerializer().serializeToString(clone), w, h };
-}
-
-async function exportMarkmapAsPng(mm) {
-  const { svgString, w, h } = buildMarkmapSvgString(mm);
-  const ratio = Math.min(3, window.devicePixelRatio || 2);
-  const canvas = document.createElement("canvas");
-  canvas.width = w * ratio;
-  canvas.height = h * ratio;
-  const ctx = canvas.getContext("2d");
-  ctx.scale(ratio, ratio);
-
-  const bg = getBgColor();
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, w, h);
-
-  const img = new Image();
-  const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-
-  await new Promise((resolve, reject) => {
-    img.onload = resolve;
-    img.onerror = reject;
-    img.src = url;
-  });
-
-  ctx.drawImage(img, 0, 0, w, h);
-  URL.revokeObjectURL(url);
-
-  const pngBlob = await new Promise((r) => canvas.toBlob(r, "image/png"));
-  downloadBlob(pngBlob, `mindmap_${timestamp()}.png`);
-}
-
-function exportMarkmapAsSvg(mm) {
-  const { svgString } = buildMarkmapSvgString(mm);
+  const svgString = new XMLSerializer().serializeToString(clone);
   const bg = getBgColor();
   const withBg = svgString.replace(
     /(<svg[^>]*>)/,
